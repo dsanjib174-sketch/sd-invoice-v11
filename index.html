@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SD Invoice V11.7 Security Release</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:Arial;margin:0;background:#eef4fb;color:#07152a}.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#12375c;padding:24px}.card{background:#fff;border:1px solid #cbd5e1;border-radius:16px;padding:18px;margin-bottom:16px}.login .card{max-width:760px;width:100%;padding:28px}header{background:#0f3157;color:#fff;padding:16px;display:flex;justify-content:space-between;align-items:center}.wrap{max-width:1500px;margin:auto;padding:18px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tab,button{border:0;background:#0f3157;color:#fff;padding:10px 14px;border-radius:9px;font-weight:700;cursor:pointer}.tab{background:#dbeafe;color:#111}.tab.on{background:#0f3157;color:#fff}.sec{display:none}.sec.on{display:block}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.sum{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.box{background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:12px}.box b{display:block;font-size:22px}input,select{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;margin-top:4px}label{font-size:13px;font-weight:700}table{width:100%;border-collapse:collapse}td,th{border:1px solid #cbd5e1;padding:8px;font-size:13px;vertical-align:top}th{background:#eaf1ff}.ok{background:#15803d}.warn{background:#b45309}.bad{background:#b91c1c}.gray{background:#475569}.logo{max-height:58px;max-width:180px;background:#fff;border-radius:8px;padding:3px}.note{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:12px;margin-bottom:16px}#app{display:none}@media(max-width:900px){.grid,.sum{grid-template-columns:1fr}header{display:block}}
+</style>
+</head>
+<body>
+<div id="login" class="login">
+<div class="card">
+<h1>SD Invoice V11.7 Security Release</h1>
+<p><b>Super Admin:</b> superadmin / admin123</p>
+<p><b>Demo Client:</b> demo@sdinvoice.com / admin / 1234</p>
+<label>Login Type</label><select id="loginType" onchange="setDefaults()"><option>Super Admin</option><option>Client</option></select>
+<label>Email</label><input id="email">
+<label>User ID</label><input id="userId">
+<label>Password</label><input id="password" type="password">
+<button onclick="loginNow()">Login</button> <button class="gray" onclick="toggleForgot()">Forgot Password</button>
+<div id="forgotBox" style="display:none;margin-top:14px;border-top:1px solid #cbd5e1;padding-top:12px">
+<h3>Forgot Password</h3>
+<label>Login Type</label><select id="fpType"><option>Client</option><option>Super Admin</option></select>
+<label>Email (Client only)</label><input id="fpEmail" placeholder="demo@sdinvoice.com">
+<label>User ID</label><input id="fpUser" placeholder="admin / superadmin">
+<button class="ok" onclick="generateResetToken()">Generate Reset Token</button>
+<label>Reset Token</label><input id="resetToken" placeholder="Paste token">
+<label>New Password</label><input id="resetNewPass" type="password" placeholder="Minimum 6 characters">
+<button class="ok" onclick="resetPassword()">Reset Password</button>
+</div> <button class="ok" onclick="repair()">Repair Login</button>
+<p id="msg" style="color:#b91c1c;font-weight:bold"></p>
+</div>
+</div>
+
+<div id="app">
+<header><div><img id="topLogo" class="logo" style="display:none"><h2>SD Invoice V11.7 Security Release</h2></div><button class="bad" onclick="location.reload()">Logout</button></header>
+<div class="wrap">
+<div class="note"><b>Stable Release:</b> stable full release with professional invoice print/download format.</div>
+<div class="tabs" id="tabs"></div>
+
+<section id="dash" class="sec on">
+<div class="sum"><div class="box">Clients<b id="dClients">0</b></div><div class="box">Branches<b id="dBranches">0</b></div><div class="box">Users<b id="dUsers">0</b></div><div class="box">MRR<b id="dMRR">₹0</b></div><div class="box">Sales<b id="dSales">₹0</b></div></div>
+<div class="card"><h2 id="welcome"></h2><table><tbody id="meTable"></tbody></table></div>
+</section>
+
+<section id="clients" class="sec">
+<div class="card"><h2>Super Admin: Client Registration</h2><input type="hidden" id="editClientId">
+<div class="grid"><input id="cName" placeholder="Company Name"><input id="cEmail" placeholder="Email"><input id="cUser" value="admin" placeholder="User ID"><input id="cPass" value="1234" placeholder="Password"></div>
+<div class="grid"><input id="cGstin" placeholder="GSTIN"><input id="cPhone" placeholder="Phone"><select id="cPlan"></select><select id="cStatus"><option>Active</option><option>Trial</option><option>Suspended</option><option>Inactive</option></select></div>
+<div class="grid"><input id="cStart" type="date" title="Subscription Start Date"><input id="cExpiry" type="date" title="Subscription End Date"><input id="cAddress" placeholder="Address"><input id="cBranch" value="Main Branch" placeholder="Main Branch"></div>
+<div class="grid"><input id="cPrefix" value="MAIN" placeholder="Prefix"></div>
+<button class="ok" onclick="saveClient()">Save Client</button> <button class="gray" onclick="clearClient()">Clear</button></div>
+<div class="card"><h2>Client List</h2><table><thead><tr><th>Company</th><th>Email</th><th>Plan</th><th>Status</th><th>Expiry</th><th>Branches</th><th>Users</th><th>Action</th></tr></thead><tbody id="clientTable"></tbody></table></div>
+</section>
+
+<section id="plans" class="sec">
+<div class="card"><h2>Plan Edit</h2><input type="hidden" id="editPlanCode">
+<div class="grid"><input id="plCode" placeholder="Code"><input id="plName" placeholder="Name"><input id="plPrice" type="number" placeholder="Price"><input id="plDays" type="number" placeholder="Days"></div>
+<div class="grid"><input id="plBranches" type="number" placeholder="Branches"><input id="plUsers" type="number" placeholder="Users"><input id="plInvoices" type="number" placeholder="Invoices"><select id="plWhite"><option value="1">White Label Yes</option><option value="0">White Label No</option></select></div>
+<button class="ok" onclick="savePlan()">Save Plan</button></div>
+<div class="card"><table><thead><tr><th>Code</th><th>Name</th><th>Price</th><th>Duration</th><th>Branches</th><th>Users</th><th>Invoices</th><th>Action</th></tr></thead><tbody id="planTable"></tbody></table></div>
+</section>
+
+<section id="offlineSub" class="sec">
+<div class="card"><h2>Offline Subscription / Yearly Plan Assignment</h2>
+<div class="grid"><select id="osClient"></select><select id="osPlan"></select><input id="osAmount" type="number" placeholder="Yearly Amount"><input id="osStart" type="date" title="Subscription Start Date"></div>
+<div class="grid"><input id="osEnd" type="date" title="Subscription End Date"><select id="osStatus"><option>Paid</option><option>Pending</option><option>Overdue</option></select><input id="osMode" placeholder="Payment Mode"><input id="osRef" placeholder="Payment Ref"></div>
+<button class="ok" onclick="offlineSub()">Generate Yearly Subscription</button></div>
+</section>
+
+<section id="subscription" class="sec">
+<div class="card" id="subClientBox" style="display:none"><h2>Super Admin Subscription View</h2><select id="subClientSelect" onchange="loadSubscription()"><option value="all">All Clients</option></select></div>
+<div class="card"><h2>Subscription Summary</h2><table><tbody id="subSummary"></tbody></table></div>
+<div class="card"><h2>Subscription Invoices</h2><table><thead><tr><th>Date</th><th>No</th><th>Client/Plan</th><th>Amount</th><th>GST</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="subInvTable"></tbody></table></div>
+<div class="card"><h2>Subscription Events</h2><table><tbody id="subEventTable"></tbody></table></div>
+</section>
+
+<section id="company" class="sec">
+<div class="card"><h2>Company Logo</h2><div class="grid"><input type="file" id="logoFile" accept="image/*" onchange="previewLogo()"><img id="logoPreview" class="logo"><button class="ok" onclick="saveLogo()">Save Logo</button></div><table><tbody id="companyTable"></tbody></table></div>
+</section>
+
+<section id="branches" class="sec">
+<div class="card"><h2>Create Branch</h2><div class="grid"><input id="bMaster" value="MASTER-001" placeholder="Master ID"><input id="bId" placeholder="Branch ID e.g. BR-002"><input id="bName" placeholder="Branch Name"><input id="bPrefix" placeholder="Prefix"></div><button class="ok" onclick="createBranch()">Create Branch</button></div>
+<div class="card"><table><thead><tr><th>Master</th><th>Branch ID</th><th>Name</th><th>Prefix</th></tr></thead><tbody id="branchTable"></tbody></table></div>
+</section>
+
+<section id="masters" class="sec">
+<div class="card"><h2>Customer Master</h2><div class="grid"><input id="vName" placeholder="Customer"><input id="vGstin" placeholder="GSTIN"><input id="vState" placeholder="State"><input id="vDue" type="number" value="15"></div><button class="ok" onclick="createCustomer()">Save Customer</button></div>
+<div class="card"><h2>Product Master</h2><div class="grid"><input id="pName" placeholder="Product"><input id="pHsn" placeholder="HSN"><input id="pPrice" type="number" placeholder="Price"><input id="pGst" type="number" value="18"></div><button class="ok" onclick="createProduct()">Save Product</button></div>
+<div class="card"><table><tbody id="masterTable"></tbody></table></div>
+</section>
+
+
+
+<section id="rateContract" class="sec">
+<div class="card">
+<h2>Rate Contract / Vendor-wise Pricing</h2>
+<input type="hidden" id="rcId">
+<div class="grid">
+<select id="rcCustomer"></select>
+<select id="rcProduct" onchange="fillRcProduct()"></select>
+<input id="rcItem" placeholder="Item / Service Name">
+<input id="rcHsn" placeholder="HSN/SAC">
+</div>
+<div class="grid">
+<input id="rcUom" value="Nos" placeholder="UOM">
+<input id="rcRate" type="number" placeholder="Approved Rate">
+<input id="rcGst" type="number" value="18" placeholder="GST %">
+<input id="rcDiscount" type="number" value="0" placeholder="Discount %">
+</div>
+<div class="grid">
+<input id="rcStart" type="date" title="Contract Start Date">
+<input id="rcEnd" type="date" title="Contract End Date">
+<select id="rcStatus"><option>Active</option><option>Inactive</option><option>Expired</option></select>
+<select id="rcManual"><option value="0">Manual Rate Locked</option><option value="1">Manual Rate Allowed</option></select>
+</div>
+<div class="grid">
+<input id="rcRemarks" placeholder="Remarks">
+<button class="ok" onclick="saveRateContract()">Save Rate Contract</button>
+<button class="gray" onclick="clearRateContract()">Clear</button>
+<button onclick="downloadROC()">Download ROC Report</button>
+</div>
+</div>
+<div class="card">
+<h2>Rate Contract List</h2>
+<table>
+<thead><tr><th>Customer/Vendor</th><th>Item</th><th>HSN</th><th>Rate</th><th>GST</th><th>Validity</th><th>Status</th><th>Manual</th><th>Action</th></tr></thead>
+<tbody id="rateContractTable"></tbody>
+</table>
+</div>
+</section>
+
+<section id="invoice" class="sec">
+<div class="card"><h2>Create Invoice</h2>
+<div class="grid">
+<select id="iType" onchange="nextNo()"><option>Tax Invoice</option><option>Proforma Invoice</option><option>Quotation</option></select>
+<select id="iBranch" onchange="nextNo()"></select>
+<input id="iNo" placeholder="Invoice No">
+<input id="iDate" type="date">
+</div>
+<div class="grid">
+<input id="iDue" type="date">
+<select id="iCustomer"></select>
+<select id="iProduct" onchange="fillProduct()"></select>
+<input id="iQty" type="number" value="1" placeholder="Qty">
+</div>
+<div class="grid">
+<input id="iRate" type="number" placeholder="Rate">
+<input id="iGst" type="number" value="18" placeholder="GST %">
+<button class="ok" onclick="addInvoiceItem()">Add Line Item</button>
+<button class="gray" onclick="clearInvoiceItems()">Clear Items</button>
+</div>
+</div>
+
+<div class="card"><h2>Invoice Line Items</h2>
+<table><thead><tr><th>#</th><th>Product</th><th>HSN</th><th>Qty</th><th>Rate</th><th>GST %</th><th>Taxable</th><th>GST Amt</th><th>Total</th><th>Action</th></tr></thead><tbody id="invoiceItemTable"></tbody></table>
+<h3 id="invoiceGrandTotal">Grand Total: ₹0.00</h3>
+<button class="ok" onclick="saveCompiledInvoice()">Save Complete Invoice</button>
+</div>
+
+<div class="card"><h2>Invoices</h2>
+<table><thead><tr><th>No</th><th>Date</th><th>Customer</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="invoiceTable"></tbody></table>
+</div>
+<div class="card"><h2>Credit Notes</h2><table><tbody id="creditTable"></tbody></table></div>
+</section>
+
+<section id="receipts" class="sec">
+<div class="card"><h2>Receipt Entry</h2><div class="grid"><select id="rInvoice"></select><input id="rAmount" type="number" placeholder="Amount"><select id="rMode"><option>Cash</option><option>Bank</option><option>UPI</option><option>Cheque</option></select><input id="rRef" placeholder="Reference"></div><button class="ok" onclick="createReceipt()">Save Receipt</button></div>
+<div class="card"><table><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Amount</th><th>Mode</th><th>Ref</th></tr></thead><tbody id="receiptTable"></tbody></table></div>
+</section>
+
+<section id="ledger" class="sec">
+<div class="card"><h2>Ledger</h2><button onclick="downloadLedger()">Download CSV</button><table><thead><tr><th>Date</th><th>No</th><th>Type</th><th>Customer</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Status</th></tr></thead><tbody id="ledgerTable"></tbody></table></div>
+</section>
+
+<section id="gst" class="sec">
+<div class="card"><h2>GST / GSP</h2><div class="grid"><input id="gstPeriod" placeholder="Return Period e.g. 042026"><button onclick="generateGstr()">Generate GSTR-1 JSON</button></div><pre id="gstOut"></pre></div>
+<div class="card"><h2>GST Logs</h2><table><tbody id="gstLogs"></tbody></table></div>
+</section>
+
+<section id="integration" class="sec">
+<div class="card"><h2>Tally / SAP Logs</h2><p>Use export buttons from invoice table.</p><table><tbody id="integrationLogs"></tbody></table></div>
+</section>
+
+<section id="enterprise" class="sec">
+<div class="card"><h2>White Label</h2><div class="grid"><input id="brandName" placeholder="Brand Name"><input id="primaryColor" placeholder="#0f3157"><input id="customDomain" placeholder="Custom Domain"><input id="supportEmail" placeholder="Support Email"></div><button class="ok" onclick="saveWhiteLabel()">Save White Label</button></div>
+<div class="card"><h2>AI Analytics</h2><button onclick="loadAI()">Generate AI Analytics</button><table><tbody id="aiTable"></tbody></table></div>
+<div class="card"><h2>Email / SMS / WhatsApp Demo</h2><div class="grid"><select id="nChannel"><option>email</option><option>sms</option><option>whatsapp</option></select><input id="nTo" placeholder="Recipient"><input id="nSub" placeholder="Subject"><input id="nMsg" placeholder="Message"></div><button onclick="sendNotify()">Send Demo Notification</button><table><tbody id="notifyLogs"></tbody></table></div>
+</section>
+
+<section id="security" class="sec">
+<div class="card"><h2>Change Password</h2>
+<div class="grid"><input id="oldPass" type="password" placeholder="Old Password"><input id="newPass" type="password" placeholder="New Password"><input id="confirmPass" type="password" placeholder="Confirm New Password"><button class="ok" onclick="changePassword()">Change Password</button></div>
+</div>
+<div class="card"><h2>Login History</h2><button onclick="loadLoginHistory()">Refresh Login History</button><table><thead><tr><th>Date/Time</th><th>Login Type</th><th>User ID</th><th>Status</th><th>IP</th></tr></thead><tbody id="loginHistoryTable"></tbody></table></div>
+</section>
+
+<section id="audit" class="sec"><div class="card"><h2>Audit Logs</h2><table><tbody id="auditTable"></tbody></table></div></section>
+</div>
+</div>
+
+<script>
+let token='', isSuper=false, customers=[], products=[], invoices=[], clients=[], plans=[], logoData='', rateContracts=[], ledger=[];
+
+const money = n => '₹' + Number(n||0).toFixed(2);
+const today = () => new Date().toISOString().slice(0,10);
+
+function setText(id, value){ const el=document.getElementById(id); if(el) el.innerText=value; }
+function setHtml(id, value){ const el=document.getElementById(id); if(el) el.innerHTML=value; }
+function val(id){ return document.getElementById(id)?.value || ''; }
+function exists(id){ return !!document.getElementById(id); }
+
+function nextYearDate(){
+  const d=new Date();
+  d.setFullYear(d.getFullYear()+1);
+  return d.toISOString().slice(0,10);
+}
+
+async function api(url,opt={}){
+  opt.headers = opt.headers || {};
+  opt.headers['Content-Type']='application/json';
+  if(token) opt.headers.Authorization='Bearer '+token;
+  const r = await fetch(url,opt);
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw d;
+  return d;
+}
+async function authDownload(url,name){
+  const r = await fetch(url + (url.includes('?')?'&':'?') + 'token=' + encodeURIComponent(token));
+  if(!r.ok){ alert('Download failed'); return; }
+  const b = await r.blob();
+  const a = document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click();
+}
+function setDefaults(){
+  if(loginType.value==='Super Admin'){ email.value=''; userId.value='superadmin'; password.value='admin123'; }
+  else { email.value='demo@sdinvoice.com'; userId.value='admin'; password.value='1234'; }
+}
+function makeTabs(){
+  const arr = isSuper
+    ? [['dash','Dashboard'],['clients','Client Registration'],['plans','Plan Edit'],['offlineSub','Offline Subscription'],['subscription','Subscription Portal'],['company','Company/Logo'],['branches','Branches'],['masters','Masters'],['rateContract','Rate Contract'],['invoice','Invoice'],['receipts','Receipts'],['ledger','Ledger'],['gst','GST/GSP'],['integration','Tally/SAP'],['enterprise','Enterprise'],['security','Security'],['audit','Audit']]
+    : [['dash','Dashboard'],['company','Company/Logo'],['subscription','Subscription'],['branches','Branches'],['masters','Masters'],['rateContract','Rate Contract'],['invoice','Invoice'],['receipts','Receipts'],['ledger','Ledger'],['gst','GST/GSP'],['integration','Tally/SAP'],['enterprise','Enterprise'],['security','Security'],['audit','Audit']];
+  tabs.innerHTML = arr.map((x,i)=>`<button class="tab ${i===0?'on':''}" onclick="tab('${x[0]}',this)">${x[1]}</button>`).join('');
+}
+function tab(id,btn){
+  document.querySelectorAll('.sec').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  const section=document.getElementById(id);
+  if(section) section.classList.add('on');
+  if(btn) btn.classList.add('on');
+  loadAll().catch(e=>{
+    console.error('Tab load error:',e);
+    alert(e.error || e.message || 'Tab loading error. Please check module data.');
+  });
+}
+async function loginNow(){
+  try{
+    const url = loginType.value==='Super Admin' ? '/api/super/login' : '/api/login';
+    const body = loginType.value==='Super Admin' ? {userId:userId.value,password:password.value} : {email:email.value,userId:userId.value,password:password.value};
+    const d = await api(url,{method:'POST',body:JSON.stringify(body)});
+    token=d.token; isSuper=loginType.value==='Super Admin';
+    login.style.display='none'; app.style.display='block'; makeTabs();
+    welcome.innerText = 'Welcome, ' + d.user.userId + ' (' + d.user.role + ')';
+    iDate.value=today(); iDue.value=today();
+    await loadAll();
+  }catch(e){ msg.innerText=e.error||'Login failed'; }
+}
+async function repair(){ const d=await api('/api/repair-login',{method:'POST',body:'{}'}); msg.innerText=d.message; }
+
+function editClient(id){ const c=clients.find(x=>x.id===id); if(!c)return; editClientId.value=c.id;cName.value=c.company_name;cEmail.value=c.email;cGstin.value=c.gstin||'';cPhone.value=c.phone||'';cAddress.value=c.address||'';cPlan.value=c.plan;cStatus.value=c.status;cStart.value=c.subscription_start_date||'';cExpiry.value=c.subscription_end_date||c.expiry_date||''; }
+function clearClient(){ editClientId.value=''; cName.value=''; cEmail.value=''; cGstin.value=''; cPhone.value=''; cAddress.value=''; cStart.value=''; cUser.value='admin'; cPass.value='1234'; cBranch.value='Main Branch'; cPrefix.value='MAIN'; }
+async function saveClient(){
+  try{
+    if(!cName.value || !cEmail.value){ alert('Company Name and Email are required'); return; }
+    const body={company_name:cName.value,email:cEmail.value,user_id:cUser.value,password:cPass.value,gstin:cGstin.value,phone:cPhone.value,plan:cPlan.value,status:cStatus.value,expiry_date:cExpiry.value,subscription_start_date:cStart.value,subscription_end_date:cExpiry.value,address:cAddress.value,branch_name:cBranch.value,branch_prefix:cPrefix.value};
+    if(editClientId.value){ await api('/api/super/clients/'+editClientId.value,{method:'PUT',body:JSON.stringify(body)}); alert('Client updated'); }
+    else { const d=await api('/api/super/clients',{method:'POST',body:JSON.stringify(body)}); alert(d.message||'Client created'); }
+    clearClient(); await loadAll();
+  }catch(e){ alert(e.error||'Client save failed'); }
+}
+async function setStatus(id,status){ await api('/api/super/clients/'+id+'/status',{method:'POST',body:JSON.stringify({status})}); await loadAll(); }
+
+function editPlan(code){ const p=plans.find(x=>x.code===code); if(!p)return; editPlanCode.value=p.code;plCode.value=p.code;plCode.disabled=true;plName.value=p.name;plPrice.value=p.price;plDays.value=p.duration_days;plBranches.value=p.max_branches;plUsers.value=p.max_users;plInvoices.value=p.max_invoices;plWhite.value=String(p.white_label); }
+async function savePlan(){
+  try{
+    const body={code:plCode.value,name:plName.value,price:+plPrice.value,duration_days:+plDays.value,max_branches:+plBranches.value,max_users:+plUsers.value,max_invoices:+plInvoices.value,white_label:plWhite.value==='1',gst:true,tally_sap:true,gsp:true};
+    if(editPlanCode.value){ await api('/api/super/plans/'+editPlanCode.value,{method:'PUT',body:JSON.stringify(body)}); }
+    else { await api('/api/super/plans',{method:'POST',body:JSON.stringify(body)}); }
+    editPlanCode.value=''; plCode.disabled=false; await loadAll();
+  }catch(e){ alert(e.error||'Plan save failed'); }
+}
+async function offlineSub(){
+  try{
+    if(!osStart.value||!osEnd.value){ alert('Please select subscription start date and end date'); return; }
+    const d=await api('/api/super/offline-subscription',{method:'POST',body:JSON.stringify({client_id:osClient.value,plan_code:osPlan.value,amount:osAmount.value,subscription_start_date:osStart.value,subscription_end_date:osEnd.value,status:osStatus.value,payment_mode:osMode.value,payment_ref:osRef.value})});
+    alert('Subscription invoice generated: '+d.invoice_no);
+    await loadAll();
+  }catch(e){ alert(e.error||'Subscription failed'); }
+}
+async function loadSubscription(){
+  try{
+    if(isSuper){
+      subClientBox.style.display='block';
+      if(subClientSelect.value==='all'){
+        const d=await api('/api/super/subscription-overview');
+        subSummary.innerHTML=`<tr><th>Total Clients</th><td>${d.summary.total_clients}</td><th>Total Invoices</th><td>${d.summary.total_invoices}</td></tr>`;
+        subInvTable.innerHTML=(d.invoices||[]).map(x=>`<tr><td>${x.invoice_date}</td><td>${x.invoice_no}</td><td>${x.company_name}</td><td>${money(x.amount)}</td><td>${money(x.gst_amount)}</td><td>${money(x.total)}</td><td>${x.status}</td><td><button onclick="openSub(${x.id})">View</button><button onclick="downloadSub(${x.id},'${x.invoice_no}')">Download</button></td></tr>`).join('') || '<tr><td colspan="8">No subscription invoice found</td></tr>';
+        subEventTable.innerHTML=(d.events||[]).map(x=>`<tr><td>${x.created_at}</td><td>${x.company_name}</td><td>${x.plan_code}</td><td>${money(x.amount)}</td><td>${x.status}</td></tr>`).join('') || '<tr><td>No events</td></tr>';
+      }else{
+        const d=await api('/api/super/client/'+subClientSelect.value+'/subscription-summary');
+        subSummary.innerHTML=`<tr><th>Company</th><td>${d.client.company_name}</td><th>Plan</th><td>${d.client.plan}</td></tr><tr><th>Status</th><td>${d.client.status}</td><th>Start Date</th><td>${d.client.subscription_start_date||''}</td></tr><tr><th>End Date</th><td>${d.client.subscription_end_date||d.client.expiry_date||''}</td><th>Billing</th><td>Yearly</td></tr>`;
+        subInvTable.innerHTML=(d.invoices||[]).map(x=>`<tr><td>${x.invoice_date}</td><td>${x.invoice_no}</td><td>${x.plan_code}</td><td>${money(x.amount)}</td><td>${money(x.gst_amount)}</td><td>${money(x.total)}</td><td>${x.status}</td><td><button onclick="openSub(${x.id})">View</button><button onclick="downloadSub(${x.id},'${x.invoice_no}')">Download</button></td></tr>`).join('') || '<tr><td colspan="8">No invoice</td></tr>';
+        subEventTable.innerHTML=(d.events||[]).map(x=>`<tr><td>${x.created_at}</td><td>${x.plan_code}</td><td>${money(x.amount)}</td><td>${x.status}</td></tr>`).join('');
+      }
+    }else{
+      subClientBox.style.display='none';
+      const me=await api('/api/me'), inv=await api('/api/subscription/invoices'), ev=await api('/api/subscription/events');
+      subSummary.innerHTML=`<tr><th>Company</th><td>${me.client.company_name}</td><th>Plan</th><td>${me.client.plan}</td></tr><tr><th>Status</th><td>${me.client.status}</td><th>Start Date</th><td>${me.client.subscription_start_date||''}</td></tr><tr><th>End Date</th><td>${me.client.subscription_end_date||me.client.expiry_date||''}</td><th>Billing</th><td>Yearly</td></tr>`;
+      subInvTable.innerHTML=(inv||[]).map(x=>`<tr><td>${x.invoice_date}</td><td>${x.invoice_no}</td><td>${x.plan_code}</td><td>${money(x.amount)}</td><td>${money(x.gst_amount)}</td><td>${money(x.total)}</td><td>${x.status}</td><td><button onclick="openSub(${x.id})">View</button><button onclick="downloadSub(${x.id},'${x.invoice_no}')">Download</button></td></tr>`).join('') || '<tr><td colspan="8">No subscription invoice found</td></tr>';
+      subEventTable.innerHTML=(ev||[]).map(x=>`<tr><td>${x.created_at}</td><td>${x.plan_code}</td><td>${money(x.amount)}</td><td>${x.status}</td></tr>`).join('');
+    }
+  }catch(e){ subSummary.innerHTML='<tr><td style="color:red">'+(e.error||'Subscription load failed')+'</td></tr>'; }
+}
+function openSub(id){ window.open('/api/subscription-invoice/'+id+'/html?token='+encodeURIComponent(token),'_blank'); }
+function downloadSub(id,no){ authDownload('/api/subscription-invoice/'+id+'/download',no+'.html'); }
+
+function previewLogo(){
+  const f=logoFile.files[0]; if(!f)return;
+  const r=new FileReader(); r.onload=e=>{ logoData=e.target.result; logoPreview.src=logoData; topLogo.src=logoData; topLogo.style.display='inline-block'; }; r.readAsDataURL(f);
+}
+async function saveLogo(){ if(!logoData){alert('Select logo first');return;} await api('/api/company/logo',{method:'PUT',body:JSON.stringify({logo_data:logoData,logo_name:logoFile.files[0]?.name||'logo'})}); alert('Logo saved'); await loadAll(); }
+
+async function createBranch(){
+  try{
+    if(!bMaster.value||!bId.value||!bName.value||!bPrefix.value){ alert('Fill all branch fields'); return; }
+    const d=await api('/api/branches',{method:'POST',body:JSON.stringify({master_id:bMaster.value,branch_id:bId.value,branch_name:bName.value,branch_prefix:bPrefix.value,prefix:bPrefix.value})});
+    alert(d.message||'Branch created'); bId.value=''; bName.value=''; bPrefix.value=''; await loadAll();
+  }catch(e){ alert(e.error||'Branch creation failed'); }
+}
+async function createCustomer(){ await api('/api/customers',{method:'POST',body:JSON.stringify({name:vName.value,gstin:vGstin.value,state:vState.value,due_days:vDue.value})}); await loadAll(); }
+async function createProduct(){ await api('/api/products',{method:'POST',body:JSON.stringify({name:pName.value,hsn:pHsn.value,price:pPrice.value,gst:pGst.value})}); await loadAll(); }
+function fillProduct(){ const p=products.find(x=>x.id==iProduct.value); if(p){ iRate.value=p.price; iGst.value=p.gst; } }
+async function nextNo(){ if(!iBranch.value)return; const d=await api('/api/next-invoice-no?branch_id='+iBranch.value+'&type='+encodeURIComponent(iType.value)); iNo.value=d.invoice_no; }
+async function createInvoice(){ return saveCompiledInvoice(); }
+function openInvoice(id){ window.open('/api/invoice/'+id+'/html?token='+encodeURIComponent(token),'_blank'); }
+function downloadInvoice(id,no){ authDownload('/api/invoice/'+id+'/download',no+'.html'); }
+
+
+
+function fillRcProduct(){ const p=products.find(x=>x.id==rcProduct.value); if(p){ rcItem.value=p.name; rcHsn.value=p.hsn; rcUom.value=p.unit||'Nos'; rcRate.value=p.price; rcGst.value=p.gst; } }
+function clearRateContract(){ rcId.value=''; rcItem.value=''; rcHsn.value=''; rcUom.value='Nos'; rcRate.value=''; rcGst.value='18'; rcDiscount.value='0'; rcStart.value=''; rcEnd.value=''; rcStatus.value='Active'; rcManual.value='0'; rcRemarks.value=''; }
+async function saveRateContract(){
+ try{
+  const body={customer_id:rcCustomer.value,product_id:rcProduct.value,item_name:rcItem.value,hsn:rcHsn.value,uom:rcUom.value,approved_rate:rcRate.value,gst:rcGst.value,discount:rcDiscount.value,start_date:rcStart.value,end_date:rcEnd.value,status:rcStatus.value,manual_override:rcManual.value==='1',remarks:rcRemarks.value};
+  if(rcId.value) await api('/api/rate-contracts/'+rcId.value,{method:'PUT',body:JSON.stringify(body)});
+  else await api('/api/rate-contracts',{method:'POST',body:JSON.stringify(body)});
+  clearRateContract(); await loadAll();
+ }catch(e){ alert(e.error||'ROC save failed'); }
+}
+function editRateContract(id){ const r=rateContracts.find(x=>x.id===id); if(!r)return; rcId.value=r.id; rcCustomer.value=r.customer_id; rcProduct.value=r.product_id||''; rcItem.value=r.item_name; rcHsn.value=r.hsn; rcUom.value=r.uom; rcRate.value=r.approved_rate; rcGst.value=r.gst; rcDiscount.value=r.discount; rcStart.value=r.start_date||''; rcEnd.value=r.end_date||''; rcStatus.value=r.status; rcManual.value=String(r.manual_override||0); rcRemarks.value=r.remarks||''; }
+async function inactiveRateContract(id){ await api('/api/rate-contracts/'+id,{method:'DELETE'}); await loadAll(); }
+async function downloadROC(){ await authDownload('/api/reports/rate-contracts.csv','Rate_Contract_Report.csv'); }
+
+async function cancelInv(id){ if(confirm('Cancel this invoice?')){ await api('/api/invoices/'+id+'/cancel',{method:'POST',body:'{}'}); await loadAll(); } }
+async function creditInv(id){ const reason=prompt('Credit note reason','Invoice cancelled'); if(reason!==null){ await api('/api/invoices/'+id+'/credit-note',{method:'POST',body:JSON.stringify({reason})}); await loadAll(); } }
+
+async function createReceipt(){
+ try{
+  const inv=invoices.find(x=>x.invoice_no===rInvoice.value);
+  await api('/api/receipts',{method:'POST',body:JSON.stringify({branch_id:inv?.branch_id,invoice_no:rInvoice.value,customer_name:inv?.customer_name||'',amount:rAmount.value,mode:rMode.value,ref_no:rRef.value,receipt_date:today()})});
+  rAmount.value=''; rRef.value=''; await loadAll();
+ }catch(e){ alert(e.error||'Receipt failed'); }
+}
+function downloadLedger(){
+ const csv=['Date,No,Type,Customer,Debit,Credit,Balance,Status',...ledger.map(l=>[l.date,l.no,l.type,l.customer,l.debit,l.credit,l.balance,l.status].map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','))].join('\\n');
+ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='ledger.csv'; a.click();
+}
+async function generateGstr(){ const d=await api('/api/gst/gstr1.json?period='+encodeURIComponent(gstPeriod.value)); gstOut.innerText=JSON.stringify(d,null,2); await loadAll(); }
+async function exportTally(id,no){ await authDownload('/api/integrations/export/tally/'+id,no+'_tally.xml'); await loadAll(); }
+async function exportSap(id,no){ const d=await api('/api/integrations/export/sap/'+id); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'})); a.download=no+'_sap.json'; a.click(); await loadAll(); }
+async function loadAI(){ const d=await api('/api/ai/analytics'); aiTable.innerHTML=`<tr><th>Invoices</th><td>${d.summary.invoices}</td><th>Net Sales</th><td>${money(d.summary.net_sales)}</td><th>Cancelled</th><td>${d.summary.cancelled}</td></tr><tr><th>Insights</th><td colspan="5">${d.insights.join('<br>')}</td></tr><tr><th>Recommendations</th><td colspan="5">${d.recommendations.join('<br>')}</td></tr>`; }
+async function saveWhiteLabel(){ await api('/api/white-label/settings',{method:'PUT',body:JSON.stringify({brand_name:brandName.value,primary_color:primaryColor.value,custom_domain:customDomain.value,support_email:supportEmail.value})}); alert('Saved'); }
+async function sendNotify(){ await api('/api/notifications/send',{method:'POST',body:JSON.stringify({channel:nChannel.value,recipient:nTo.value,subject:nSub.value,message:nMsg.value})}); await loadAll(); }
+
+
+let invoiceItems=[];
+
+function renderInvoiceItems(){
+  if(!document.getElementById('invoiceItemTable')) return;
+  invoiceItemTable.innerHTML = invoiceItems.map((x,i)=>`<tr>
+    <td>${i+1}</td><td>${x.name}</td><td>${x.hsn}</td><td>${x.qty}</td>
+    <td>${money(x.rate)}</td><td>${x.gst}%</td><td>${money(x.taxable)}</td>
+    <td>${money(x.gst_amount)}</td><td>${money(x.total)}</td>
+    <td><button class="bad" onclick="removeInvoiceItem(${i})">Remove</button></td>
+  </tr>`).join('') || '<tr><td colspan="10">No line item added yet</td></tr>';
+  const grand = invoiceItems.reduce((a,b)=>a+Number(b.total||0),0);
+  invoiceGrandTotal.innerText = 'Grand Total: ' + money(grand);
+}
+
+function addInvoiceItem(){
+  const p = products.find(x=>x.id==iProduct.value);
+  if(!p){ alert('Please select product'); return; }
+  const qty = Number(iQty.value||0);
+  const rate = Number(iRate.value||0);
+  const gst = Number(iGst.value||0);
+  if(qty<=0 || rate<0){ alert('Please enter valid quantity and rate'); return; }
+
+  const taxable = qty * rate;
+  const gst_amount = taxable * gst / 100;
+  const total = taxable + gst_amount;
+
+  invoiceItems.push({
+    product_id:p.id,
+    name:p.name,
+    hsn:p.hsn||'',
+    qty,
+    rate,
+    gst,
+    taxable,
+    gst_amount,
+    total
+  });
+  renderInvoiceItems();
+}
+
+function removeInvoiceItem(index){
+  invoiceItems.splice(index,1);
+  renderInvoiceItems();
+}
+
+function clearInvoiceItems(){
+  invoiceItems=[];
+  renderInvoiceItems();
+}
+
+async function saveCompiledInvoice(){
+  try{
+    if(invoiceItems.length===0){
+      alert('Please add at least one line item');
+      return;
+    }
+    const c=customers.find(x=>x.id==iCustomer.value);
+    const total=invoiceItems.reduce((a,b)=>a+Number(b.total||0),0);
+
+    const result=await api('/api/invoices',{
+      method:'POST',
+      body:JSON.stringify({
+        branch_id:iBranch.value,
+        invoice_no:iNo.value,
+        invoice_type:iType.value,
+        invoice_date:iDate.value,
+        due_date:iDue.value,
+        customer_name:c?.name||'',
+        total,
+        status:'Unpaid',
+        items:invoiceItems
+      })
+    });
+
+    alert(result.message || 'Invoice saved successfully');
+    clearInvoiceItems();
+    await nextNo();
+    await loadAll();
+  }catch(e){
+    alert(e.error||'Invoice save failed');
+  }
+}
+
+
+function toggleForgot(){
+  forgotBox.style.display=forgotBox.style.display==='none'?'block':'none';
+  fpType.value=loginType.value==='Super Admin'?'Super Admin':'Client';
+  fpEmail.value=email.value||'demo@sdinvoice.com';
+  fpUser.value=userId.value||(fpType.value==='Super Admin'?'superadmin':'admin');
+}
+async function generateResetToken(){
+  try{
+    const d=await api('/api/forgot-password',{method:'POST',body:JSON.stringify({loginType:fpType.value,email:fpEmail.value,userId:fpUser.value})});
+    resetToken.value=d.reset_token; msg.innerText='Reset token generated. Expires in '+d.expires_in;
+  }catch(e){msg.innerText=e.error||'Reset token failed'}
+}
+async function resetPassword(){
+  try{
+    const d=await api('/api/reset-password',{method:'POST',body:JSON.stringify({token:resetToken.value,newPassword:resetNewPass.value})});
+    alert(d.message); forgotBox.style.display='none';
+  }catch(e){alert(e.error||'Password reset failed')}
+}
+async function changePassword(){
+  try{
+    if(newPass.value!==confirmPass.value){alert('New password and confirm password do not match');return}
+    const d=await api('/api/change-password',{method:'POST',body:JSON.stringify({oldPassword:oldPass.value,newPassword:newPass.value})});
+    alert(d.message); oldPass.value='';newPass.value='';confirmPass.value='';
+  }catch(e){alert(e.error||'Change password failed')}
+}
+async function loadLoginHistory(){
+  try{
+    const rows=await api('/api/login-history');
+    loginHistoryTable.innerHTML=rows.map(x=>`<tr><td>${x.created_at}</td><td>${x.login_type}</td><td>${x.user_id}</td><td>${x.status}</td><td>${x.ip||''}</td></tr>`).join('')||'<tr><td colspan="5">No login history found</td></tr>';
+  }catch(e){}
+}
+async function loadClientData(){
+  try{
+    const me=await api('/api/me');
+    if(me.client){
+      setHtml('meTable',`<tr><th>Company</th><td>${me.client.company_name}</td><th>Plan</th><td>${me.client.plan}</td><th>Status</th><td>${me.client.status}</td></tr>
+      <tr><th>Usage</th><td colspan="5">Branches ${me.usage.branches}/${me.plan.max_branches}, Users ${me.usage.users}/${me.plan.max_users}, Invoices ${me.usage.invoices}/${me.plan.max_invoices}</td></tr>`);
+      setHtml('companyTable',`<tr><th>Company</th><td>${me.client.company_name}</td><th>Email</th><td>${me.client.email}</td><th>GSTIN</th><td>${me.client.gstin||''}</td></tr>
+      <tr><th>Subscription Start</th><td>${me.client.subscription_start_date||''}</td><th>Subscription End</th><td>${me.client.subscription_end_date||me.client.expiry_date||''}</td><th>Billing</th><td>Yearly</td></tr>`);
+      if(me.client.logo_data){
+        logoData=me.client.logo_data;
+        if(exists('logoPreview')) logoPreview.src=logoData;
+        if(exists('topLogo')){ topLogo.src=logoData; topLogo.style.display='inline-block'; }
+      }
+    }
+
+    const br=await api('/api/branches');
+    setHtml('branchTable',br.map(b=>`<tr><td>${b.master_id}</td><td>${b.branch_id}</td><td>${b.branch_name}</td><td>${b.branch_prefix||b.prefix||''}</td></tr>`).join('') || '<tr><td colspan="4">No branch</td></tr>');
+    if(exists('iBranch')) iBranch.innerHTML=br.map(b=>`<option value="${b.id}">${b.branch_name}</option>`).join('');
+
+    customers=await api('/api/customers');
+    products=await api('/api/products');
+
+    if(exists('iCustomer')) iCustomer.innerHTML=customers.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if(exists('iProduct')) iProduct.innerHTML=products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    setHtml('masterTable',`<tr><th>Customers</th><td>${customers.length}</td><th>Products</th><td>${products.length}</td></tr>`);
+
+    if(exists('rcCustomer')) rcCustomer.innerHTML=customers.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if(exists('rcProduct')) rcProduct.innerHTML='<option value="">Select Product</option>'+products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+
+    if(typeof renderInvoiceItems==='function') renderInvoiceItems();
+
+    if(exists('rateContractTable')){
+      rateContracts=await api('/api/rate-contracts');
+      rateContractTable.innerHTML=rateContracts.map(r=>`<tr><td>${r.customer_name||''}</td><td>${r.item_name||''}</td><td>${r.hsn||''}</td><td>${money(r.approved_rate)}</td><td>${r.gst}%</td><td>${r.start_date||''} to ${r.end_date||''}</td><td>${r.computed_status}</td><td>${r.manual_override?'Allowed':'Locked'}</td><td><button onclick="editRateContract(${r.id})">Edit</button><button class="warn" onclick="inactiveRateContract(${r.id})">Inactive</button></td></tr>`).join('') || '<tr><td colspan="9">No ROC found</td></tr>';
+    }
+
+    invoices=await api('/api/invoices');
+    setText('dSales', money(invoices.reduce((a,b)=>a+Number(b.total||0),0)));
+    if(exists('rInvoice')) rInvoice.innerHTML=invoices.map(i=>`<option>${i.invoice_no}</option>`).join('');
+    setHtml('invoiceTable',invoices.map(i=>`<tr><td>${i.invoice_no}</td><td>${i.invoice_date}</td><td>${i.customer_name}</td><td>${money(i.total)}</td><td>${i.status}</td><td><button onclick="openInvoice(${i.id})">View</button><button onclick="downloadInvoice(${i.id},'${i.invoice_no}')">Download</button><button onclick="cancelInv(${i.id})">Cancel</button><button onclick="creditInv(${i.id})">Credit Note</button><button onclick="exportTally(${i.id},'${i.invoice_no}')">Tally</button><button onclick="exportSap(${i.id},'${i.invoice_no}')">SAP</button></td></tr>`).join('') || '<tr><td colspan="6">No invoice</td></tr>');
+
+    if(exists('creditTable')){
+      const credits=await api('/api/credit-notes');
+      creditTable.innerHTML=credits.map(c=>`<tr><td>${c.credit_note_no}</td><td>${c.reference_invoice_no}</td><td>${c.customer_name}</td><td>${money(c.total)}</td></tr>`).join('') || '<tr><td colspan="4">No credit note</td></tr>';
+    }
+
+    if(exists('receiptTable')){
+      const receipts=await api('/api/receipts');
+      receiptTable.innerHTML=receipts.map(r=>`<tr><td>${r.receipt_date}</td><td>${r.invoice_no}</td><td>${r.customer_name}</td><td>${money(r.amount)}</td><td>${r.mode}</td><td>${r.ref_no||''}</td></tr>`).join('') || '<tr><td colspan="6">No receipt</td></tr>';
+    }
+
+    if(exists('ledgerTable')){
+      ledger=await api('/api/reports/ledger');
+      ledgerTable.innerHTML=ledger.map(l=>`<tr><td>${l.date}</td><td>${l.no}</td><td>${l.type}</td><td>${l.customer}</td><td>${money(l.debit)}</td><td>${money(l.credit)}</td><td>${money(l.balance)}</td><td>${l.status}</td></tr>`).join('') || '<tr><td colspan="8">No ledger</td></tr>';
+    }
+
+    if(exists('gstLogs')){
+      const gst=await api('/api/gst/logs');
+      gstLogs.innerHTML=gst.map(g=>`<tr><td>${g.created_at}</td><td>${g.report_type}</td><td>${g.period}</td><td>${g.status}</td></tr>`).join('') || '<tr><td colspan="4">No GST log</td></tr>';
+    }
+
+    if(exists('integrationLogs')){
+      const il=await api('/api/integrations/logs');
+      integrationLogs.innerHTML=il.map(x=>`<tr><td>${x.created_at}</td><td>${x.source_no}</td><td>${x.integration_type}</td><td>${x.status}</td></tr>`).join('') || '<tr><td colspan="4">No integration log</td></tr>';
+    }
+
+    if(exists('notifyLogs')){
+      const nl=await api('/api/notifications/logs');
+      notifyLogs.innerHTML=nl.map(n=>`<tr><td>${n.created_at}</td><td>${n.channel}</td><td>${n.recipient}</td><td>${n.status}</td></tr>`).join('') || '<tr><td colspan="4">No notification log</td></tr>';
+    }
+
+    if(exists('brandName')){
+      const wl=await api('/api/white-label/settings');
+      brandName.value=wl.brand_name||'';
+      primaryColor.value=wl.primary_color||'';
+      customDomain.value=wl.custom_domain||'';
+      supportEmail.value=wl.support_email||'';
+    }
+  }catch(e){
+    console.error('loadClientData error:',e);
+    const active=document.querySelector('.sec.on');
+    if(active && !active.innerText.trim()){
+      active.innerHTML='<div class="card"><h2>Module Load Error</h2><p style="color:red">'+(e.error||e.message||'Unable to load module')+'</p></div>';
+    }
+  }
+}
+
+async function loadAll(){
+  try{
+    if(exists('osStart') && !osStart.value) osStart.value=today();
+    if(exists('osEnd') && !osEnd.value) osEnd.value=nextYearDate();
+    if(exists('cStart') && !cStart.value) cStart.value=today();
+    if(exists('cExpiry') && !cExpiry.value) cExpiry.value=nextYearDate();
+
+    plans=await api('/api/plans');
+    if(exists('cPlan')) cPlan.innerHTML=plans.map(p=>`<option value="${p.code}">${p.name}</option>`).join('');
+    if(exists('osPlan')) osPlan.innerHTML=plans.map(p=>`<option value="${p.code}">${p.name}</option>`).join('');
+    if(exists('planTable')) planTable.innerHTML=plans.map(p=>`<tr><td>${p.code}</td><td>${p.name}</td><td>${money(p.price)}</td><td>${p.duration_days} days (Yearly)</td><td>${p.max_branches}</td><td>${p.max_users}</td><td>${p.max_invoices}</td><td><button onclick="editPlan('${p.code}')">Edit</button></td></tr>`).join('');
+
+    if(isSuper){
+      const s=await api('/api/super/summary');
+      setText('dClients',s.clients);
+      setText('dBranches',s.branches);
+      setText('dUsers',s.users);
+      setText('dMRR',money(s.mrr));
+
+      clients=await api('/api/super/clients');
+      if(exists('osClient')) osClient.innerHTML=clients.map(c=>`<option value="${c.id}">${c.company_name} (${c.email})</option>`).join('');
+      if(exists('subClientSelect')) subClientSelect.innerHTML='<option value="all">All Clients</option>'+clients.map(c=>`<option value="${c.id}">${c.company_name} (${c.email})</option>`).join('');
+      if(exists('clientTable')) clientTable.innerHTML=clients.map(c=>`<tr><td>${c.company_name}</td><td>${c.email}</td><td>${c.plan}</td><td>${c.status}</td><td>${c.expiry_date||''}</td><td>${c.branches}</td><td>${c.users}</td><td><button onclick="editClient(${c.id})">Edit</button><button onclick="setStatus(${c.id},'Active')">Active</button><button class="warn" onclick="setStatus(${c.id},'Suspended')">Suspend</button></td></tr>`).join('');
+
+      await loadClientData();
+    }else{
+      await loadClientData();
+    }
+
+    await loadSubscription();
+
+    if(exists('loginHistoryTable')){try{await loadLoginHistory()}catch(e){}}
+    const audit=await api('/api/audit');
+    setHtml('auditTable',audit.map(a=>`<tr><td>${a.created_at}</td><td>${a.login_type}</td><td>${a.user_id}</td><td>${a.action}</td><td>${a.details}</td></tr>`).join('') || '<tr><td>No audit logs</td></tr>');
+  }catch(e){
+    console.error('loadAll error:',e);
+    alert(e.error || e.message || 'Page loading failed');
+  }
+}
+setDefaults();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
-  "name": "sd-invoice-v11-stable-full-release-professional-invoice-format",
-  "version": "11.6.6-professional-invoice",
+  "name": "sd-invoice-v11-7-security-release",
+  "version": "11.7.0-security",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

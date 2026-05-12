@@ -12,7 +12,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'sd_invoice_v11_stable_secret';
-const db = new Database('sd_invoice_v11_professional_invoice_format.db');
+const db = new Database('sd_invoice_v11_7_security_release.db');
 
 app.use(helmet({ contentSecurityPolicy:false }));
 app.use(cors());
@@ -234,6 +234,28 @@ CREATE TABLE IF NOT EXISTS white_label_settings(
  created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_tokens(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ login_type TEXT,
+ client_id INTEGER,
+ user_id TEXT,
+ email TEXT,
+ token TEXT UNIQUE,
+ expires_at TEXT,
+ used INTEGER DEFAULT 0,
+ created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS login_history(
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ login_type TEXT,
+ client_id INTEGER,
+ user_id TEXT,
+ status TEXT,
+ ip TEXT,
+ created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS audit_logs(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  client_id INTEGER,
@@ -332,6 +354,12 @@ function checkLimit(clientId,type){
   return null;
 }
 
+
+function expiryMinutes(minutes){const d=new Date();d.setMinutes(d.getMinutes()+minutes);return d.toISOString();}
+function isExpired(iso){return new Date(iso).getTime()<Date.now();}
+function makeResetToken(){return crypto.randomBytes(24).toString('hex');}
+function logLogin(loginType,clientId,userId,status,req){try{db.prepare("INSERT INTO login_history(login_type,client_id,user_id,status,ip) VALUES(?,?,?,?,?)").run(loginType,clientId||null,userId||'',status,req.ip||'')}catch(e){}}
+
 app.get('/api/health',(req,res)=>res.json({version:'V11 Stable Full Release',status:'OK',super_admin:'superadmin / admin123',demo_client:'demo@sdinvoice.com / admin / 1234'}));
 app.post('/api/repair-login',(req,res)=>{ seed(); res.json({success:true,message:'Login repaired',super_admin:'superadmin / admin123',demo_client:'demo@sdinvoice.com / admin / 1234'}); });
 
@@ -340,8 +368,8 @@ app.post('/api/super/login',async(req,res)=>{
   const password=String(req.body.password||'').trim();
   let s=db.prepare("SELECT * FROM super_admins WHERE user_id=?").get(userId);
   if(!s){ seed(); s=db.prepare("SELECT * FROM super_admins WHERE user_id=?").get(userId); }
-  if(!s || !(await bcrypt.compare(password,s.password_hash))) return res.status(401).json({error:'Use superadmin / admin123'});
-  res.json({success:true,token:token({superAdmin:true,loginType:'SuperAdmin',userCode:userId,userId}),user:{userId,role:'SuperAdmin'}});
+  if(!s || !(await bcrypt.compare(password,s.password_hash))){logLogin('SuperAdmin',null,userId,'Failed',req); return res.status(401).json({error:'Use superadmin / admin123'});}
+  logLogin('SuperAdmin',null,userId,'Success',req); res.json({success:true,token:token({superAdmin:true,loginType:'SuperAdmin',userCode:userId,userId}),user:{userId,role:'SuperAdmin'}});
 });
 
 app.post('/api/login',async(req,res)=>{
@@ -352,8 +380,8 @@ app.post('/api/login',async(req,res)=>{
   if(!c) return res.status(401).json({error:'Client email not found'});
   if(!['Active','Trial'].includes(c.status)) return res.status(403).json({error:'Client not active'});
   const u=db.prepare("SELECT * FROM users WHERE client_id=? AND user_id=? AND is_active=1").get(c.id,userId);
-  if(!u || !(await bcrypt.compare(password,u.password_hash))) return res.status(401).json({error:'Wrong client login'});
-  res.json({success:true,token:token({loginType:'Client',clientId:c.id,userId:u.id,userCode:u.user_id,role:u.role,branchId:u.branch_id}),client:c,user:{userId:u.user_id,role:u.role,branchId:u.branch_id}});
+  if(!u || !(await bcrypt.compare(password,u.password_hash))){logLogin('Client',c.id,userId,'Failed',req); return res.status(401).json({error:'Wrong client login'});}
+  logLogin('Client',c.id,u.user_id,'Success',req); res.json({success:true,token:token({loginType:'Client',clientId:c.id,userId:u.id,userCode:u.user_id,role:u.role,branchId:u.branch_id}),client:c,user:{userId:u.user_id,role:u.role,branchId:u.branch_id}});
 });
 
 app.get('/api/plans',(req,res)=>res.json(db.prepare("SELECT * FROM plans ORDER BY id").all()));
@@ -838,6 +866,67 @@ app.put('/api/white-label/settings',auth,clientOnly,(req,res)=>{
 });
 
 
+
+app.post('/api/forgot-password',(req,res)=>{
+ const loginType=String(req.body.loginType||'Client').trim();
+ const email=String(req.body.email||'').trim();
+ const userId=String(req.body.userId||'').trim();
+ if(loginType==='Super Admin'){
+   const s=db.prepare("SELECT * FROM super_admins WHERE user_id=?").get(userId||'superadmin');
+   if(!s)return res.status(404).json({error:'Super Admin not found'});
+   const rt=makeResetToken();
+   db.prepare("INSERT INTO password_reset_tokens(login_type,user_id,email,token,expires_at) VALUES(?,?,?,?,?)").run('SuperAdmin',s.user_id,email||'',rt,expiryMinutes(30));
+   return res.json({success:true,message:'Reset token generated',reset_token:rt,expires_in:'30 minutes'});
+ }
+ const c=db.prepare("SELECT * FROM clients WHERE email=?").get(email);
+ if(!c)return res.status(404).json({error:'Client email not found'});
+ const u=db.prepare("SELECT * FROM users WHERE client_id=? AND user_id=?").get(c.id,userId||'admin');
+ if(!u)return res.status(404).json({error:'Client user not found'});
+ const rt=makeResetToken();
+ db.prepare("INSERT INTO password_reset_tokens(login_type,client_id,user_id,email,token,expires_at) VALUES(?,?,?,?,?,?)").run('Client',c.id,u.user_id,email,rt,expiryMinutes(30));
+ res.json({success:true,message:'Reset token generated',reset_token:rt,expires_in:'30 minutes'});
+});
+
+app.post('/api/reset-password',async(req,res)=>{
+ const rt=String(req.body.token||'').trim();
+ const np=String(req.body.newPassword||'').trim();
+ if(!rt)return res.status(400).json({error:'Reset token required'});
+ if(np.length<6)return res.status(400).json({error:'New password must be at least 6 characters'});
+ const row=db.prepare("SELECT * FROM password_reset_tokens WHERE token=? AND used=0").get(rt);
+ if(!row)return res.status(400).json({error:'Invalid or used reset token'});
+ if(isExpired(row.expires_at))return res.status(400).json({error:'Reset token expired'});
+ const hp=await bcrypt.hash(np,10);
+ if(row.login_type==='SuperAdmin') db.prepare("UPDATE super_admins SET password_hash=? WHERE user_id=?").run(hp,row.user_id);
+ else db.prepare("UPDATE users SET password_hash=? WHERE client_id=? AND user_id=?").run(hp,row.client_id,row.user_id);
+ db.prepare("UPDATE password_reset_tokens SET used=1 WHERE id=?").run(row.id);
+ res.json({success:true,message:'Password reset successfully'});
+});
+
+app.post('/api/change-password',auth,async(req,res)=>{
+ const oldp=String(req.body.oldPassword||'').trim();
+ const newp=String(req.body.newPassword||'').trim();
+ if(!oldp||!newp)return res.status(400).json({error:'Old and new password required'});
+ if(newp.length<6)return res.status(400).json({error:'New password must be at least 6 characters'});
+ if(req.user.superAdmin){
+   const s=db.prepare("SELECT * FROM super_admins WHERE user_id=?").get(req.user.userCode||req.user.userId||'superadmin');
+   if(!s)return res.status(404).json({error:'Super Admin not found'});
+   if(!(await bcrypt.compare(oldp,s.password_hash)))return res.status(401).json({error:'Old password is incorrect'});
+   db.prepare("UPDATE super_admins SET password_hash=? WHERE user_id=?").run(await bcrypt.hash(newp,10),s.user_id);
+   return res.json({success:true,message:'Password changed successfully'});
+ }
+ const u=db.prepare("SELECT * FROM users WHERE id=? AND client_id=?").get(req.user.userId,req.user.clientId);
+ if(!u)return res.status(404).json({error:'User not found'});
+ if(!(await bcrypt.compare(oldp,u.password_hash)))return res.status(401).json({error:'Old password is incorrect'});
+ db.prepare("UPDATE users SET password_hash=? WHERE id=? AND client_id=?").run(await bcrypt.hash(newp,10),u.id,req.user.clientId);
+ res.json({success:true,message:'Password changed successfully'});
+});
+
+app.get('/api/login-history',auth,(req,res)=>{
+ if(req.user.superAdmin)return res.json(db.prepare("SELECT * FROM login_history ORDER BY id DESC LIMIT 200").all());
+ res.json(db.prepare("SELECT * FROM login_history WHERE client_id=? ORDER BY id DESC LIMIT 100").all(req.user.clientId));
+});
+
+
 app.get('/api/audit',auth,(req,res)=>res.json(db.prepare("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 200").all()));
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-app.listen(PORT,()=>console.log('SD Invoice V11 Stable Full Release - Professional Invoice Format running at http://localhost:'+PORT));
+app.listen(PORT,()=>console.log('SD Invoice V11.7 Security Release'+PORT));
