@@ -1,24 +1,16 @@
-# SD Invoice V11 Stable Full Release - Professional Invoice Format
+# SD Invoice V11.7 Security Release
 
-## Integrated
-- Professional invoice print/download format
-- Company logo in invoice
-- Company GSTIN/address/email/phone
-- Invoice details box
-- Bill To and Branch boxes
-- Professional item table
-- Taxable amount, CGST, SGST and GST total
-- Grand total section
-- Bank details section
-- Authorised signatory section
-- Terms & Conditions
-- Cancelled watermark
-- Print / Save as PDF button
+Added:
+- Forgot Password
+- Reset Password Token
+- Change Password
+- Login History
+- Super Admin and Client password support
 
-## Login
+Login:
 Super Admin: superadmin / admin123
 Demo Client: demo@sdinvoice.com / admin / 1234
 
-## Validation
-Server syntax checked.
-Frontend JavaScript syntax checked.
+Render:
+Build Command: npm install
+Start Command: npm start
